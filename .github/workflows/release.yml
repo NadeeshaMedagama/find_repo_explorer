@@ -9,6 +9,11 @@ on:
   push:
     tags: ['v*.*.*']
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g., v1.0.0)'
+        required: true
+        type: string
 
 permissions:
   contents: write
@@ -19,24 +24,37 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Determine tag
+        id: tag_info
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+
+          # Validate tag format
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+ ]]; then
+            echo "::error::Invalid tag format '$TAG'. Expected format: v*.*.*"
+            exit 1
+          fi
+
+          VERSION="${TAG#v}"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Tag: $TAG | Version: $VERSION"
+
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Extract version from tag
-        id: version
-        run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
-          echo "📦 Version: $VERSION"
+          ref: ${{ steps.tag_info.outputs.tag }}
 
       - name: Generate release notes
         id: notes
         run: |
           cat > RELEASE_NOTES.md << 'HEREDOC'
-          ## 🔍 FindRepo v${{ steps.version.outputs.version }}
+          ## 🔍 FindRepo v${{ steps.tag_info.outputs.version }}
 
           **GitHub Repository Explorer** — Search, explore, and discover repositories within any GitHub organization.
 
@@ -52,13 +70,13 @@ jobs:
 
           ```bash
           # Pull from Docker Hub
-          docker pull ${{ github.repository_owner }}/findrepo:${{ steps.version.outputs.version }}
+          docker pull ${{ github.repository_owner }}/findrepo:${{ steps.tag_info.outputs.version }}
 
           # Pull from GitHub Packages
-          docker pull ghcr.io/${{ github.repository }}/findrepo:${{ steps.version.outputs.version }}
+          docker pull ghcr.io/${{ github.repository }}/findrepo:${{ steps.tag_info.outputs.version }}
 
           # Run locally
-          docker run -d -p 8080:80 ${{ github.repository_owner }}/findrepo:${{ steps.version.outputs.version }}
+          docker run -d -p 8080:80 ${{ github.repository_owner }}/findrepo:${{ steps.tag_info.outputs.version }}
           ```
 
           ### 🌐 Quick Start (No Docker)
@@ -81,13 +99,13 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.version.outputs.tag }}
-          name: "FindRepo ${{ steps.version.outputs.tag }}"
+          tag_name: ${{ steps.tag_info.outputs.tag }}
+          name: "FindRepo ${{ steps.tag_info.outputs.tag }}"
           body_path: RELEASE_NOTES.md
           generate_release_notes: true
           append_body: true
           draft: false
-          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          prerelease: ${{ contains(steps.tag_info.outputs.tag, '-rc') || contains(steps.tag_info.outputs.tag, '-beta') || contains(steps.tag_info.outputs.tag, '-alpha') }}
           files: |
             index.html
             style.css
