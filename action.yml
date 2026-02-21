@@ -1,0 +1,97 @@
+# ============================================
+# GitHub Marketplace Action — FindRepo
+# Deploy FindRepo as a containerized service
+# ============================================
+
+name: 'FindRepo — GitHub Repository Explorer'
+description: 'Deploy and serve FindRepo, a web-based GitHub organization repository explorer, as a Docker container in your workflows.'
+author: 'FindRepo Team'
+
+branding:
+  icon: 'search'
+  color: 'purple'
+
+inputs:
+  port:
+    description: 'Host port to expose the application on'
+    required: false
+    default: '8080'
+  image-tag:
+    description: 'Docker image tag to use (e.g., latest, v1.0.0, sha-abc1234)'
+    required: false
+    default: 'latest'
+  container-name:
+    description: 'Name for the Docker container'
+    required: false
+    default: 'findrepo'
+  registry:
+    description: 'Container registry to pull from (dockerhub or ghcr)'
+    required: false
+    default: 'ghcr'
+  github-token:
+    description: 'GitHub token for pulling from GHCR (defaults to github.token)'
+    required: false
+    default: ${{ github.token }}
+
+outputs:
+  url:
+    description: 'URL where FindRepo is accessible'
+    value: ${{ steps.deploy.outputs.url }}
+  container-id:
+    description: 'Docker container ID'
+    value: ${{ steps.deploy.outputs.container_id }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Determine image reference
+      id: image
+      shell: bash
+      run: |
+        if [ "${{ inputs.registry }}" = "ghcr" ]; then
+          IMAGE="ghcr.io/${{ github.repository }}:${{ inputs.image-tag }}"
+        else
+          IMAGE="${{ github.repository_owner }}/findrepo:${{ inputs.image-tag }}"
+        fi
+        echo "ref=$IMAGE" >> $GITHUB_OUTPUT
+        echo "📦 Using image: $IMAGE"
+
+    - name: Pull Docker image
+      shell: bash
+      run: |
+        if [ "${{ inputs.registry }}" = "ghcr" ]; then
+          echo "${{ inputs.github-token }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+        fi
+        docker pull ${{ steps.image.outputs.ref }}
+
+    - name: Deploy FindRepo container
+      id: deploy
+      shell: bash
+      run: |
+        echo "🚀 Starting FindRepo on port ${{ inputs.port }}..."
+        
+        # Stop existing container if running
+        docker stop ${{ inputs.container-name }} 2>/dev/null || true
+        docker rm ${{ inputs.container-name }} 2>/dev/null || true
+        
+        # Run container
+        CONTAINER_ID=$(docker run -d \
+          --name ${{ inputs.container-name }} \
+          -p ${{ inputs.port }}:80 \
+          --restart unless-stopped \
+          ${{ steps.image.outputs.ref }})
+        
+        echo "container_id=$CONTAINER_ID" >> $GITHUB_OUTPUT
+        echo "url=http://localhost:${{ inputs.port }}" >> $GITHUB_OUTPUT
+        
+        # Wait for container to be ready
+        sleep 3
+        
+        # Verify deployment
+        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:${{ inputs.port }}/ || echo "000")
+        if [ "$HTTP_STATUS" = "200" ]; then
+          echo "✅ FindRepo is running at http://localhost:${{ inputs.port }}"
+        else
+          echo "⚠️ FindRepo may not be ready yet (HTTP $HTTP_STATUS)"
+          docker logs ${{ inputs.container-name }}
+        fi
