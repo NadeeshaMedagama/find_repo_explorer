@@ -1,0 +1,123 @@
+# ============================================
+# Docker Build, Test & Push — FindRepo
+# Builds and pushes to Docker Hub
+# ============================================
+
+name: Docker Build & Push
+
+on:
+  push:
+    branches: [master]
+    tags: ['v*.*.*']
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+env:
+  DOCKERHUB_REPO: ${{ secrets.DOCKERHUB_USERNAME }}/findrepo
+
+jobs:
+  docker:
+    name: 🐳 Build, Test & Push
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up QEMU (multi-platform)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.DOCKERHUB_REPO }}
+          tags: |
+            # Tag with 'latest' on master branch push
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with short SHA
+            type=sha,prefix=sha-
+            # Tag with semver on version tags
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+          labels: |
+            org.opencontainers.image.title=FindRepo
+            org.opencontainers.image.description=GitHub Repository Explorer — Search, explore, and discover repos within any GitHub organization
+            org.opencontainers.image.vendor=FindRepo
+
+      # Build for testing (single platform, load into local Docker)
+      - name: Build Docker image for testing
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: findrepo:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Test container
+        run: |
+          echo "🚀 Starting test container..."
+          docker run -d --name findrepo-test -p 8080:80 findrepo:test
+          sleep 3
+
+          echo "🔍 Running health checks..."
+          
+          # Check HTTP status
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+          echo "  HTTP Status: $HTTP_STATUS"
+          [ "$HTTP_STATUS" = "200" ] || { echo "::error::HTTP check failed"; docker logs findrepo-test; exit 1; }
+
+          # Check page content
+          curl -s http://localhost:8080/ | grep -q "FindRepo" || { echo "::error::Content check failed"; exit 1; }
+          echo "  ✅ Page content verified"
+          
+          # Check static assets
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/style.css)" = "200" ] || { echo "::error::CSS not served"; exit 1; }
+          [ "$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/app.js)" = "200" ] || { echo "::error::JS not served"; exit 1; }
+          echo "  ✅ Static assets verified"
+
+          # Check security headers
+          curl -sI http://localhost:8080/ | grep -qi "X-Content-Type-Options" && echo "  ✅ Security headers present"
+          
+          echo "✅ All tests passed!"
+
+      - name: Cleanup test container
+        if: always()
+        run: |
+          docker stop findrepo-test || true
+          docker rm findrepo-test || true
+
+      # Push to Docker Hub (only on master branch push or version tags)
+      - name: Log in to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          platforms: linux/amd64,linux/arm64
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Docker Hub description
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          echo "🎉 Image pushed to Docker Hub!"
+          echo "📦 Repository: ${{ env.DOCKERHUB_REPO }}"
+          echo "🏷️ Tags: ${{ steps.meta.outputs.tags }}"
