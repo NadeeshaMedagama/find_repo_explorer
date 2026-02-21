@@ -1,0 +1,118 @@
+# ============================================
+# Dependency Updates — FindRepo
+# Weekly check for base image updates and rebuild
+# ============================================
+
+name: Dependency Updates
+
+on:
+  schedule:
+    # Run every Monday at 06:00 UTC
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_rebuild:
+        description: 'Force rebuild even if no updates detected'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  check-base-image:
+    name: 🔄 Check Base Image Updates
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check for nginx base image updates
+        id: check
+        run: |
+          echo "🔍 Checking for nginx:1.27-alpine updates..."
+          
+          # Pull the latest version of the base image
+          docker pull nginx:1.27-alpine 2>/dev/null
+          
+          # Get the digest of the latest image
+          LATEST_DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' nginx:1.27-alpine 2>/dev/null || echo "unknown")
+          echo "  Latest digest: $LATEST_DIGEST"
+          
+          # Build our image and check if it uses the latest base
+          docker build -t findrepo:check . 2>/dev/null
+          BUILD_SUCCESS=$?
+          
+          if [ $BUILD_SUCCESS -eq 0 ]; then
+            echo "  ✅ Docker build successful with latest base image"
+            echo "build_status=success" >> $GITHUB_OUTPUT
+          else
+            echo "  ❌ Docker build failed"
+            echo "build_status=failure" >> $GITHUB_OUTPUT
+          fi
+          
+          echo "digest=$LATEST_DIGEST" >> $GITHUB_OUTPUT
+
+      - name: Test updated image
+        if: steps.check.outputs.build_status == 'success'
+        run: |
+          echo "🧪 Testing updated image..."
+          docker run -d --name findrepo-update-test -p 8080:80 findrepo:check
+          sleep 3
+          
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+          if [ "$HTTP_STATUS" = "200" ]; then
+            echo "  ✅ Updated image serves content correctly (HTTP $HTTP_STATUS)"
+          else
+            echo "  ❌ Updated image test failed (HTTP $HTTP_STATUS)"
+            docker logs findrepo-update-test
+          fi
+          
+          docker stop findrepo-update-test || true
+          docker rm findrepo-update-test || true
+
+      - name: Create issue on build failure
+        if: steps.check.outputs.build_status == 'failure'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const title = '🔴 Docker build failed with updated base image';
+            const body = `## Docker Build Failure
+
+            The weekly dependency check detected that the Docker build fails with the latest \`nginx:1.27-alpine\` base image.
+
+            **Base Image Digest:** \`${{ steps.check.outputs.digest }}\`
+            **Workflow Run:** [View Run](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+            ### Action Required
+            - Review the build logs for error details
+            - Update the Dockerfile if necessary
+            - Consider pinning to a specific nginx version if needed
+
+            ---
+            *This issue was automatically created by the Dependency Updates workflow.*`;
+
+            // Check if a similar issue already exists
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'dependencies,automated'
+            });
+
+            const existingIssue = issues.data.find(i => i.title === title);
+            if (!existingIssue) {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: title,
+                body: body,
+                labels: ['dependencies', 'automated', 'bug']
+              });
+              console.log('Issue created successfully');
+            } else {
+              console.log('Similar issue already exists, skipping creation');
+            }
