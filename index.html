@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FindRepo – GitHub Repository Explorer</title>
+  <meta name="description" content="Search and explore GitHub repositories within any organization using your personal access token and keyword filters." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Animated Background -->
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
+  </div>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <svg class="logo-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 0C5.374 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23A11.509 11.509 0 0 1 12 5.803c1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.566 21.797 24 17.3 24 12c0-6.627-5.373-12-12-12z"/>
+        </svg>
+        <span class="logo-text">FindRepo</span>
+      </div>
+      <span class="header-tag">GitHub Repository Explorer</span>
+    </div>
+  </header>
+
+  <!-- Main Content -->
+  <main class="main">
+    <!-- Search Panel -->
+    <section class="search-panel" id="search-panel">
+      <div class="panel-header">
+        <h1 class="panel-title">Explore GitHub Repositories</h1>
+        <p class="panel-subtitle">Enter your credentials to discover repositories within any GitHub organization</p>
+      </div>
+
+      <form class="search-form" id="search-form" novalidate>
+        <!-- Token Field -->
+        <div class="form-group">
+          <label class="form-label" for="token-input">
+            <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            GitHub Personal Access Token
+          </label>
+          <div class="input-wrapper">
+            <input
+              type="password"
+              id="token-input"
+              class="form-input"
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              autocomplete="off"
+              spellcheck="false"
+              required
+            />
+            <button type="button" class="toggle-visibility" id="toggle-token" aria-label="Toggle token visibility" title="Show/hide token">
+              <svg class="eye-icon show-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+                <circle cx="12" cy="12" r="3"/>
+              </svg>
+              <svg class="eye-icon hide-icon hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/>
+                <line x1="1" y1="1" x2="23" y2="23"/>
+              </svg>
+            </button>
+          </div>
+          <span class="form-hint">Your token needs <code>repo</code> scope for private repos or <code>read:org</code> for org access</span>
+        </div>
+
+        <!-- Organization Field -->
+        <div class="form-group">
+          <label class="form-label" for="org-input">
+            <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+              <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
+            Organization Name
+          </label>
+          <div class="input-wrapper">
+            <input
+              type="text"
+              id="org-input"
+              class="form-input"
+              placeholder="e.g. google, microsoft, facebook"
+              autocomplete="off"
+              spellcheck="false"
+              required
+            />
+          </div>
+          <span class="form-hint">The exact GitHub organization handle (case-insensitive)</span>
+        </div>
+
+        <!-- Keyword Field -->
+        <div class="form-group">
+          <label class="form-label" for="keyword-input">
+            <svg class="label-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="11" cy="11" r="8"/>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            Keyword / Filter
+          </label>
+          <div class="input-wrapper">
+            <input
+              type="text"
+              id="keyword-input"
+              class="form-input"
+              placeholder="e.g. api, frontend, ml, auth"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+          <span class="form-hint">Filters by repo name, description, or topics (leave empty to show all)</span>
+        </div>
+
+        <!-- Submit -->
+        <button type="submit" class="search-btn" id="search-btn">
+          <span class="btn-text">Search Repositories</span>
+          <svg class="btn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <span class="btn-loader hidden">
+            <span class="spinner"></span>
+            Searching...
+          </span>
+        </button>
+      </form>
+    </section>
+
+    <!-- Results Section -->
+    <section class="results-section hidden" id="results-section">
+      <!-- Results Header -->
+      <div class="results-header">
+        <div class="results-meta">
+          <h2 class="results-title" id="results-title">Repositories Found</h2>
+          <div class="results-stats" id="results-stats"></div>
+        </div>
+        <div class="results-controls">
+          <div class="sort-wrapper">
+            <label class="sort-label" for="sort-select">Sort by</label>
+            <select class="sort-select" id="sort-select">
+              <option value="stars">⭐ Stars</option>
+              <option value="updated">🕐 Updated</option>
+              <option value="name">🔤 Name</option>
+              <option value="forks">🍴 Forks</option>
+            </select>
+          </div>
+          <button class="back-btn" id="back-btn" title="New Search">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M19 12H5M12 5l-7 7 7 7"/>
+            </svg>
+            New Search
+          </button>
+        </div>
+      </div>
+
+      <!-- Filter Bar -->
+      <div class="filter-bar" id="filter-bar">
+        <button class="filter-chip active" data-filter="all">All</button>
+        <button class="filter-chip" data-filter="public">Public</button>
+        <button class="filter-chip" data-filter="private">Private</button>
+        <button class="filter-chip" data-filter="forked">Forked</button>
+        <button class="filter-chip" data-filter="archived">Archived</button>
+      </div>
+
+      <!-- Repository Grid -->
+      <div class="repo-grid" id="repo-grid"></div>
+
+      <!-- Empty State -->
+      <div class="empty-state hidden" id="empty-state">
+        <div class="empty-icon">🔍</div>
+        <h3>No repositories found</h3>
+        <p>Try changing your keyword or check that the organization name is correct</p>
+      </div>
+
+      <!-- Load More -->
+      <div class="load-more-wrapper hidden" id="load-more-wrapper">
+        <button class="load-more-btn" id="load-more-btn">
+          Load More Repositories
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 5v14M5 12l7 7 7-7"/>
+          </svg>
+        </button>
+      </div>
+    </section>
+
+    <!-- Error Banner -->
+    <div class="error-banner hidden" id="error-banner">
+      <div class="error-inner">
+        <svg class="error-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span class="error-message" id="error-message"></span>
+        <button class="error-close" id="error-close" aria-label="Dismiss error">✕</button>
+      </div>
+    </div>
+  </main>
+
+  <!-- Repo Detail Modal -->
+  <div class="modal-overlay hidden" id="modal-overlay" role="dialog" aria-modal="true">
+    <div class="modal" id="modal">
+      <button class="modal-close" id="modal-close" aria-label="Close modal">✕</button>
+      <div class="modal-content" id="modal-content"></div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <p>FindRepo &mdash; Built with the <a href="https://docs.github.com/en/rest" target="_blank" rel="noopener">GitHub REST API</a>. Your token is never stored or sent anywhere except GitHub.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
