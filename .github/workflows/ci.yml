@@ -1,0 +1,260 @@
+# ============================================
+# CI Pipeline — FindRepo
+# Validates HTML, CSS, JS, and Docker build
+# ============================================
+
+name: CI Pipeline
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+permissions:
+  contents: read
+
+jobs:
+  # ──────────────────────────────────────────
+  # Job 1: Validate project structure
+  # ──────────────────────────────────────────
+  validate-structure:
+    name: 📁 Validate Project Structure
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check required files exist
+        run: |
+          echo "🔍 Checking required files..."
+          missing=0
+          for file in index.html style.css app.js README.md Dockerfile nginx.conf; do
+            if [ -f "$file" ]; then
+              echo "  ✅ $file exists ($(wc -c < "$file") bytes)"
+            else
+              echo "  ❌ $file is MISSING"
+              missing=1
+            fi
+          done
+          if [ $missing -eq 1 ]; then
+            echo "::error::Required files are missing!"
+            exit 1
+          fi
+          echo "✅ All required files present"
+
+      - name: Validate HTML structure
+        run: |
+          echo "🔍 Checking HTML structure..."
+          # Check for essential HTML elements
+          grep -q '<!DOCTYPE html>' index.html && echo "  ✅ DOCTYPE declaration found" || { echo "  ❌ Missing DOCTYPE"; exit 1; }
+          grep -q '<html' index.html && echo "  ✅ <html> tag found" || { echo "  ❌ Missing <html> tag"; exit 1; }
+          grep -q '<head>' index.html && echo "  ✅ <head> tag found" || { echo "  ❌ Missing <head> tag"; exit 1; }
+          grep -q '<body>' index.html && echo "  ✅ <body> tag found" || { echo "  ❌ Missing <body> tag"; exit 1; }
+          grep -q '<meta charset' index.html && echo "  ✅ charset meta found" || { echo "  ❌ Missing charset meta"; exit 1; }
+          grep -q '<meta name="viewport"' index.html && echo "  ✅ viewport meta found" || { echo "  ❌ Missing viewport meta"; exit 1; }
+          grep -q 'style.css' index.html && echo "  ✅ CSS link found" || { echo "  ❌ Missing CSS link"; exit 1; }
+          grep -q 'app.js' index.html && echo "  ✅ JS script found" || { echo "  ❌ Missing JS script"; exit 1; }
+          echo "✅ HTML structure is valid"
+
+  # ──────────────────────────────────────────
+  # Job 2: Lint HTML
+  # ──────────────────────────────────────────
+  lint-html:
+    name: 🌐 Lint HTML
+    runs-on: ubuntu-latest
+    needs: validate-structure
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create HTMLHint config
+        run: |
+          cat > .htmlhintrc << 'EOF'
+          {
+          "tagname-lowercase": true,
+          "attr-lowercase": true,
+          "attr-value-double-quotes": true,
+          "doctype-first": true,
+          "tag-pair": true,
+          "spec-char-escape": false,
+          "id-unique": true,
+          "src-not-empty": true,
+          "title-require": true,
+          "alt-require": true,
+          "doctype-html5": true,
+          "style-disabled": false,
+          "inline-style-disabled": false,
+          "inline-script-disabled": false,
+          "id-class-value": false,
+          "attr-unsafe-chars": true
+          }
+          EOF
+
+      - name: Run HTMLHint
+        run: npx --yes htmlhint@latest index.html
+
+  # ──────────────────────────────────────────
+  # Job 3: Lint CSS
+  # ──────────────────────────────────────────
+  lint-css:
+    name: 🎨 Lint CSS
+    runs-on: ubuntu-latest
+    needs: validate-structure
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create Stylelint config
+        run: |
+          cat > .stylelintrc.json << 'EOF'
+          {
+          "extends": "stylelint-config-standard",
+          "rules": {
+            "no-descending-specificity": null,
+            "selector-class-pattern": null,
+            "custom-property-pattern": null,
+            "declaration-block-no-redundant-longhand-properties": null,
+            "shorthand-property-no-redundant-values": null,
+            "alpha-value-notation": null,
+            "color-function-notation": null,
+            "property-no-vendor-prefix": null,
+            "value-no-vendor-prefix": null,
+            "selector-no-vendor-prefix": null,
+            "at-rule-no-vendor-prefix": null,
+            "media-feature-range-notation": null,
+            "import-notation": null,
+            "font-family-name-quotes": null,
+            "number-max-precision": null
+          }
+          }
+          EOF
+
+      - name: Install Stylelint
+        run: npm install --no-save stylelint stylelint-config-standard
+
+      - name: Run Stylelint
+        run: npx stylelint --config .stylelintrc.json "style.css"
+
+  # ──────────────────────────────────────────
+  # Job 4: Lint JavaScript
+  # ──────────────────────────────────────────
+  lint-js:
+    name: ⚡ Lint JavaScript
+    runs-on: ubuntu-latest
+    needs: validate-structure
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Create ESLint config
+        run: |
+          cat > eslint.config.mjs << 'EOF'
+          export default [
+            {
+              files: ["app.js"],
+              languageOptions: {
+                ecmaVersion: 2022,
+                sourceType: "script",
+                globals: {
+                  window: "readonly",
+                  document: "readonly",
+                  console: "readonly",
+                  sessionStorage: "readonly",
+                  fetch: "readonly",
+                  Date: "readonly",
+                  setTimeout: "readonly",
+                  clearTimeout: "readonly",
+                  URL: "readonly",
+                  HTMLElement: "readonly",
+                  Event: "readonly",
+                  RegExp: "readonly",
+                  Math: "readonly",
+                  Array: "readonly",
+                },
+              },
+              rules: {
+                "no-unused-vars": "warn",
+                "no-undef": "error",
+                "no-console": "off",
+                "semi": ["warn", "always"],
+                "no-var": "error",
+                "prefer-const": "warn",
+                "eqeqeq": ["warn", "smart"],
+              },
+            },
+          ];
+          EOF
+
+      - name: Run ESLint
+        run: npx --yes eslint@latest app.js
+
+  # ──────────────────────────────────────────
+  # Job 5: Docker build test
+  # ──────────────────────────────────────────
+  docker-build-test:
+    name: 🐳 Docker Build Test
+    runs-on: ubuntu-latest
+    needs: [lint-html, lint-css, lint-js]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t findrepo:test .
+
+      - name: Start container
+        run: |
+          docker run -d --name findrepo-test -p 8080:80 findrepo:test
+          sleep 3
+
+      - name: Test container is serving content
+        run: |
+          echo "🔍 Testing HTTP response..."
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/)
+          echo "  HTTP Status: $HTTP_STATUS"
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "::error::Expected HTTP 200, got $HTTP_STATUS"
+            docker logs findrepo-test
+            exit 1
+          fi
+
+          echo "🔍 Checking page content..."
+          CONTENT=$(curl -s http://localhost:8080/)
+          echo "$CONTENT" | grep -q "FindRepo" && echo "  ✅ FindRepo title found" || { echo "  ❌ FindRepo title missing"; exit 1; }
+          
+          echo "🔍 Checking static assets..."
+          CSS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/style.css)
+          JS_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8080/app.js)
+          echo "  CSS Status: $CSS_STATUS"
+          echo "  JS Status: $JS_STATUS"
+          [ "$CSS_STATUS" = "200" ] && echo "  ✅ CSS file served" || { echo "  ❌ CSS not served"; exit 1; }
+          [ "$JS_STATUS" = "200" ] && echo "  ✅ JS file served" || { echo "  ❌ JS not served"; exit 1; }
+
+          echo "🔍 Checking security headers..."
+          HEADERS=$(curl -sI http://localhost:8080/)
+          echo "$HEADERS" | grep -qi "X-Content-Type-Options" && echo "  ✅ X-Content-Type-Options header present" || echo "  ⚠️ X-Content-Type-Options header missing"
+          echo "$HEADERS" | grep -qi "X-Frame-Options" && echo "  ✅ X-Frame-Options header present" || echo "  ⚠️ X-Frame-Options header missing"
+          
+          echo "✅ All container tests passed!"
+
+      - name: Cleanup
+        if: always()
+        run: |
+          docker stop findrepo-test || true
+          docker rm findrepo-test || true
