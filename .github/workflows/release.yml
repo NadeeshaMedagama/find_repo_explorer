@@ -1,0 +1,99 @@
+# ============================================
+# Release Management — FindRepo
+# Creates GitHub Releases on version tags
+# ============================================
+
+name: Release Management
+
+on:
+  push:
+    tags: ['v*.*.*']
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 🚀 Create Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          echo "📦 Version: $VERSION"
+
+      - name: Generate release notes
+        id: notes
+        run: |
+          cat > RELEASE_NOTES.md << 'HEREDOC'
+          ## 🔍 FindRepo v${{ steps.version.outputs.version }}
+
+          **GitHub Repository Explorer** — Search, explore, and discover repositories within any GitHub organization.
+
+          ### 📦 What's Included
+
+          | File | Description |
+          |------|-------------|
+          | `index.html` | Main application page |
+          | `style.css` | Complete dark-themed styling |
+          | `app.js` | Application logic & GitHub API integration |
+
+          ### 🐳 Docker
+
+          ```bash
+          # Pull from Docker Hub
+          docker pull ${{ github.repository_owner }}/findrepo:${{ steps.version.outputs.version }}
+
+          # Pull from GitHub Packages
+          docker pull ghcr.io/${{ github.repository }}/findrepo:${{ steps.version.outputs.version }}
+
+          # Run locally
+          docker run -d -p 8080:80 ${{ github.repository_owner }}/findrepo:${{ steps.version.outputs.version }}
+          ```
+
+          ### 🌐 Quick Start (No Docker)
+
+          ```bash
+          # Download the release assets and open in browser
+          open index.html
+
+          # Or use any local server
+          python3 -m http.server 8000
+          npx serve .
+          ```
+
+          ### 🔒 Security
+          - Your GitHub token is never stored or persisted
+          - All API calls go directly to `api.github.com`
+          - No analytics, tracking, or third-party scripts
+          HEREDOC
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.version.outputs.tag }}
+          name: "FindRepo ${{ steps.version.outputs.tag }}"
+          body_path: RELEASE_NOTES.md
+          generate_release_notes: true
+          append_body: true
+          draft: false
+          prerelease: ${{ contains(github.ref, '-rc') || contains(github.ref, '-beta') || contains(github.ref, '-alpha') }}
+          files: |
+            index.html
+            style.css
+            app.js
+            README.md
+            Dockerfile
+            nginx.conf
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
