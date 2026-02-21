@@ -76,7 +76,7 @@ jobs:
 
       - name: Create issue on build failure
         if: steps.check.outputs.build_status == 'failure'
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const title = '🔴 Docker build failed with updated base image';
