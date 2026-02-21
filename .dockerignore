@@ -1,0 +1,33 @@
+# Git
+.git
+.gitignore
+
+# GitHub
+.github
+
+# Docker
+Dockerfile
+docker-compose*.yml
+.dockerignore
+
+# Documentation
+README.md
+LICENSE
+CHANGELOG.md
+CONTRIBUTING.md
+docs/
+
+# Editor/IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Linting configs
+.htmlhintrc
+.eslintrc*
+.stylelintrc*
+.editorconfig
