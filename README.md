@@ -9,6 +9,8 @@ FindRepo is a client-side web application that lets you browse and filter reposi
 ![JavaScript](https://img.shields.io/badge/JavaScript-F7DF1E?style=flat&logo=javascript&logoColor=black)
 ![GitHub API](https://img.shields.io/badge/GitHub_API-181717?style=flat&logo=github&logoColor=white)
 
+🌐 **Live Demo:** [https://find-repo-explorer.netlify.app/](https://find-repo-explorer.netlify.app/)
+
 ---
 
 ## 📖 Table of Contents
